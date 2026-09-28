@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* 90s Pixel Art Typography and Rendering Styles */
+@layer base {
+  body {
+    font-family: 'Silkscreen', 'DotGothic16', monospace, sans-serif;
+    font-size: 15px;
+    image-rendering: pixelated;
+  }
+}
+
+.font-pixel {
+  font-family: 'Silkscreen', 'DotGothic16', monospace, sans-serif;
+}
+
+.font-pixel-heading {
+  font-family: 'Press Start 2P', 'DotGothic16', monospace, cursive;
+}
+
+/* 90s Stone Slab Pixel Borders (Beveled stone brick effect) */
+.pixel-stone-panel {
+  background-color: #26211c;
+  background-image: radial-gradient(#3a3229 15%, transparent 16%), radial-gradient(#1e1a16 15%, transparent 16%);
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 4px;
+  box-shadow: 
+    inset 3px 3px 0px #5c4e3f,
+    inset -3px -3px 0px #110e0b,
+    0 0 0 3px #0f0d0b,
+    0 8px 20px rgba(0,0,0,0.85);
+  border: 3px solid #7c6853;
+}
+
+.pixel-stone-btn {
+  background-color: #3b3227;
+  box-shadow: 
+    inset 2px 2px 0px #6d5b47,
+    inset -2px -2px 0px #1b1610,
+    0 0 0 2px #0f0d0b;
+  border: 2px solid #574635;
+  transition: all 0.1s steps(2);
+}
+
+.pixel-stone-btn:active {
+  box-shadow: 
+    inset 2px 2px 0px #1b1610,
+    inset -2px -2px 0px #6d5b47,
+    0 0 0 2px #0f0d0b;
+  transform: translateY(2px);
+}
+
+.pixel-gold-btn {
+  background-color: #d97706;
+  background-image: linear-gradient(135deg, #fbbf24 25%, #b45309 75%);
+  box-shadow: 
+    inset 2px 2px 0px #fef08a,
+    inset -2px -2px 0px #78350f,
+    0 0 0 2px #451a03;
+  border: 2px solid #f59e0b;
+  color: #1c1917;
+  font-weight: bold;
+}
+
+.pixel-gold-btn:active {
+  box-shadow: 
+    inset 2px 2px 0px #78350f,
+    inset -2px -2px 0px #fef08a,
+    0 0 0 2px #451a03;
+  transform: translateY(2px);
+}
+
+/* Mobile touch enhancements */
+html, body {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior-y: none;
+}
+

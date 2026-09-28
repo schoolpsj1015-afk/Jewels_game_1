@@ -1,0 +1,6 @@
+{
+  "name": "Jewel Quest 1998 - Retro 90s Match-3",
+  "description": "A classic 90s CD-ROM style match-3 relic adventure puzzle game with golden board transformation, chained gems, power-ups, and synthesized audio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
