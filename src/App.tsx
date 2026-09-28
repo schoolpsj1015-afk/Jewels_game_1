@@ -177,6 +177,76 @@ export default function App() {
     showToast('커스텀 레벨이 삭제되었습니다.');
   };
 
+  // Helper to apply gravity and refill empty/matched cells
+  const applyGravityAndRefill = (
+    workingBoard: Cell[][],
+    level: LevelConfig,
+    specialCreated?: { pos: BoardPosition; type: GemType }
+  ) => {
+    const size = level.size || workingBoard.length;
+    for (let c = 0; c < size; c++) {
+      // Collect surviving gems from bottom to top
+      const surviving: { type: GemType; isGold: boolean; isChained: boolean }[] = [];
+      for (let r = size - 1; r >= 0; r--) {
+        const cell = workingBoard[r][c];
+        if (level.validMask[r]?.[c] && !cell.isObstacle && !cell.isMatched && cell.type) {
+          surviving.push({
+            type: cell.type,
+            isGold: cell.isGold,
+            isChained: cell.isChained,
+          });
+        }
+      }
+
+      // Refill from bottom up into valid cells
+      let survivorIdx = 0;
+      for (let r = size - 1; r >= 0; r--) {
+        if (level.validMask[r]?.[c] && !workingBoard[r][c].isObstacle) {
+          if (survivorIdx < surviving.length) {
+            const item = surviving[survivorIdx++];
+            workingBoard[r][c] = {
+              r,
+              c,
+              type: item.type || createSafeGem(level.gemTypes),
+              id: workingBoard[r][c].id || generateCellId(),
+              isGold: workingBoard[r][c].isGold,
+              isChained: item.isChained,
+              isMatched: false,
+              isObstacle: false,
+            };
+          } else {
+            // Find the valid non-obstacle cell directly below in this column
+            let belowType: GemType | null = null;
+            for (let br = r + 1; br < size; br++) {
+              if (level.validMask[br]?.[c] && !workingBoard[br][c].isObstacle) {
+                belowType = workingBoard[br][c].type;
+                break;
+              }
+            }
+
+            // Spawn new gem at top (or relic if spawned at this coordinate)
+            // Strictly ensure < 2 consecutive blocks with the block below
+            const isSpecialSpawn =
+              specialCreated &&
+              specialCreated.pos.r === r &&
+              specialCreated.pos.c === c;
+
+            workingBoard[r][c] = {
+              r,
+              c,
+              type: isSpecialSpawn ? 'relic' : createSafeGem(level.gemTypes, belowType),
+              id: generateCellId(),
+              isGold: workingBoard[r][c].isGold,
+              isChained: false,
+              isMatched: false,
+              isObstacle: false,
+            };
+          }
+        }
+      }
+    }
+  };
+
   // Main Cascade Loop with Progressive Cluster Scoring
   const runCascade = useCallback(async (startBoard: Cell[][]) => {
     setIsProcessing(true);
@@ -184,6 +254,16 @@ export default function App() {
     let combo = 1;
     let keepChecking = true;
     const size = currentLevel.size || workingBoard.length;
+
+    // STEP 0: If board has any pre-matched cells (e.g. from Hammer or Relic swap), clear & refill them first!
+    const hasPreExistingMatched = workingBoard.some(row =>
+      row.some(c => c.isMatched && currentLevel.validMask[c.r]?.[c.c] && !c.isObstacle)
+    );
+    if (hasPreExistingMatched) {
+      applyGravityAndRefill(workingBoard, currentLevel);
+      setBoard(workingBoard.map(r => r.map(c => ({ ...c }))));
+      await new Promise(res => setTimeout(res, 200));
+    }
 
     while (keepChecking) {
       const matchRes = findMatches(workingBoard, currentLevel.validMask);
@@ -246,72 +326,27 @@ export default function App() {
       await new Promise(res => setTimeout(res, 200));
 
       // 2. Clear matched cells & Apply Gravity
-      for (let c = 0; c < size; c++) {
-        // Collect surviving gems from bottom to top
-        const surviving: { type: GemType; isGold: boolean; isChained: boolean }[] = [];
-        for (let r = size - 1; r >= 0; r--) {
-          const cell = workingBoard[r][c];
-          if (currentLevel.validMask[r]?.[c] && !cell.isObstacle && !cell.isMatched) {
-            surviving.push({
-              type: cell.type,
-              isGold: cell.isGold,
-              isChained: cell.isChained,
-            });
-          }
-        }
-
-        // Refill from bottom up into valid cells
-        let survivorIdx = 0;
-        for (let r = size - 1; r >= 0; r--) {
-          if (currentLevel.validMask[r]?.[c] && !workingBoard[r][c].isObstacle) {
-            if (survivorIdx < surviving.length) {
-              const item = surviving[survivorIdx++];
-              workingBoard[r][c] = {
-                r,
-                c,
-                type: item.type,
-                id: workingBoard[r][c].id,
-                isGold: workingBoard[r][c].isGold,
-                isChained: item.isChained,
-                isMatched: false,
-                isObstacle: false,
-              };
-            } else {
-              // Find the valid non-obstacle cell directly below in this column
-              let belowType: GemType | null = null;
-              for (let br = r + 1; br < size; br++) {
-                if (currentLevel.validMask[br]?.[c] && !workingBoard[br][c].isObstacle) {
-                  belowType = workingBoard[br][c].type;
-                  break;
-                }
-              }
-
-              // Spawn new gem at top (or relic if spawned at this coordinate)
-              // Strictly ensure < 2 consecutive blocks with the block below
-              const isSpecialSpawn =
-                matchRes.specialCreated &&
-                matchRes.specialCreated.pos.r === r &&
-                matchRes.specialCreated.pos.c === c;
-
-              workingBoard[r][c] = {
-                r,
-                c,
-                type: isSpecialSpawn ? 'relic' : createSafeGem(currentLevel.gemTypes, belowType),
-                id: generateCellId(),
-                isGold: workingBoard[r][c].isGold,
-                isChained: false,
-                isMatched: false,
-                isObstacle: false,
-              };
-            }
-          }
-        }
-      }
+      applyGravityAndRefill(workingBoard, currentLevel, matchRes.specialCreated);
 
       setBoard(workingBoard.map(r => r.map(c => ({ ...c }))));
       combo++;
       await new Promise(res => setTimeout(res, 180));
     }
+
+    // 3. Absolute Sanitization: Guarantee 100% of valid cells are visible, have isMatched = false, and have a valid random gem!
+    const VALID_TYPES: GemType[] = ['ruby', 'sapphire', 'emerald', 'topaz', 'diamond', 'amethyst', 'relic'];
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (currentLevel.validMask[r]?.[c] && !workingBoard[r][c].isObstacle) {
+          workingBoard[r][c].isMatched = false;
+          if (!workingBoard[r][c].type || !VALID_TYPES.includes(workingBoard[r][c].type)) {
+            workingBoard[r][c].type = createSafeGem(currentLevel.gemTypes);
+            workingBoard[r][c].id = generateCellId();
+          }
+        }
+      }
+    }
+    setBoard(workingBoard.map(r => r.map(c => ({ ...c }))));
 
     // 3. Cascade settled: Check victory!
     if (checkVictory(workingBoard, currentLevel)) {

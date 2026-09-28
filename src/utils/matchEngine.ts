@@ -5,17 +5,21 @@ export function generateCellId(): string {
   return `gem-${idCounter++}`;
 }
 
-export function createRandomGem(types: GemType[]): GemType {
-  const idx = Math.floor(Math.random() * types.length);
-  return types[idx];
+const DEFAULT_GEM_TYPES: GemType[] = ['ruby', 'sapphire', 'emerald', 'topaz'];
+
+export function createRandomGem(types?: GemType[]): GemType {
+  const pool = (types && types.length > 0) ? types : DEFAULT_GEM_TYPES;
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx] || 'ruby';
 }
 
 // Generate a gem type strictly different from avoidType to prevent >= 2 consecutive vertical blocks
-export function createSafeGem(types: GemType[], avoidType?: GemType | null): GemType {
-  const pool = avoidType ? types.filter(t => t !== avoidType) : types;
-  const targetPool = pool.length > 0 ? pool : types;
+export function createSafeGem(types?: GemType[], avoidType?: GemType | null): GemType {
+  const baseTypes = (types && types.length > 0) ? types : DEFAULT_GEM_TYPES;
+  const pool = avoidType ? baseTypes.filter(t => t !== avoidType) : baseTypes;
+  const targetPool = pool.length > 0 ? pool : baseTypes;
   const idx = Math.floor(Math.random() * targetPool.length);
-  return targetPool[idx];
+  return targetPool[idx] || 'ruby';
 }
 
 // Generate board without pre-existing matches
@@ -40,17 +44,19 @@ export function initBoard(level: LevelConfig): Cell[][] {
           isGold: false,
           isChained: false,
           isObstacle: true,
+          isMatched: false,
         });
       } else {
         const available = [...level.gemTypes].sort(() => Math.random() - 0.5);
         row.push({
           r,
           c,
-          type: available[0],
+          type: available[0] || createRandomGem(level.gemTypes),
           id: generateCellId(),
           isGold: false,
           isChained: chainedSet.has(`${r},${c}`),
           isObstacle: false,
+          isMatched: false,
         });
       }
     }
@@ -326,7 +332,8 @@ export function shuffleBoard(board: Cell[][], validMask: boolean[][], gemTypes: 
   for (let attempt = 0; attempt < 25; attempt++) {
     const gemPool = validCells.map(c => c.type).sort(() => Math.random() - 0.5);
     validCells.forEach((c, idx) => {
-      c.type = gemPool[idx];
+      c.type = gemPool[idx] || createRandomGem(gemTypes);
+      c.isMatched = false;
       c.id = generateCellId();
     });
 
@@ -342,6 +349,7 @@ export function shuffleBoard(board: Cell[][], validMask: boolean[][], gemTypes: 
   // Fallback: regenerate valid cells
   validCells.forEach(cell => {
     cell.type = createRandomGem(gemTypes);
+    cell.isMatched = false;
     cell.id = generateCellId();
   });
 

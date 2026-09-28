@@ -146,9 +146,9 @@ export const Board: React.FC<BoardProps> = ({
                 {/* The Pixel Jewel Sprite */}
                 <div className={`w-full h-full ${size >= 10 ? 'p-0.5' : 'p-0.5 sm:p-1'} flex items-center justify-center overflow-hidden`}>
                   <JewelSprite
-                    type={cell.type}
+                    type={cell.type || 'ruby'}
                     isSelected={isSelected}
-                    isMatched={cell.isMatched}
+                    isMatched={isProcessing ? !!cell.isMatched : false}
                     isChained={cell.isChained}
                   />
                 </div>

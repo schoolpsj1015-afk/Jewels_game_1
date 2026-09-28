@@ -9,13 +9,18 @@ interface JewelSpriteProps {
   isChained?: boolean;
 }
 
+const VALID_GEM_TYPES: GemType[] = ['ruby', 'sapphire', 'emerald', 'topaz', 'diamond', 'amethyst', 'relic'];
+
 export const JewelSprite: React.FC<JewelSpriteProps> = ({
-  type,
+  type: propType,
   size,
   isSelected = false,
   isMatched = false,
   isChained = false,
 }) => {
+  // Always guarantee a valid gem type so an empty or invisible SVG is never rendered
+  const type: GemType = (propType && VALID_GEM_TYPES.includes(propType)) ? propType : 'ruby';
+
   return (
     <div
       className={`relative w-full h-full flex items-center justify-center transition-transform select-none ${
