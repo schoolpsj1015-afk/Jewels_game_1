@@ -10,6 +10,14 @@ export function createRandomGem(types: GemType[]): GemType {
   return types[idx];
 }
 
+// Generate a gem type strictly different from avoidType to prevent >= 2 consecutive vertical blocks
+export function createSafeGem(types: GemType[], avoidType?: GemType | null): GemType {
+  const pool = avoidType ? types.filter(t => t !== avoidType) : types;
+  const targetPool = pool.length > 0 ? pool : types;
+  const idx = Math.floor(Math.random() * targetPool.length);
+  return targetPool[idx];
+}
+
 // Generate board without pre-existing matches
 export function initBoard(level: LevelConfig): Cell[][] {
   const size = level.size || level.validMask.length || 8;
@@ -75,96 +83,156 @@ export function initBoard(level: LevelConfig): Cell[][] {
   return board;
 }
 
-// Find all matches on board: 3 or more connected gems (orthogonal or diagonal: lines, X-shapes, 2x2 squares, clusters)
-const ADJACENT_DIRECTIONS = [
-  [-1, 0], [1, 0], [0, -1], [0, 1], // Up, Down, Left, Right
-  [-1, -1], [-1, 1], [1, -1], [1, 1], // Diagonals (X-shapes, diagonal chains)
-];
-
-// Progressive score calculation based on cluster size and combo
+// Score calculation: 3 or 4 gems per match group (5+ cannot connect)
 export function calculateMatchScore(groupSize: number, combo: number): number {
   let baseScore: number;
   if (groupSize === 3) {
-    baseScore = 300; // 100 per gem
-  } else if (groupSize === 4) {
-    baseScore = 600; // 150 per gem (2x value of 3-match)
-  } else if (groupSize === 5) {
-    baseScore = 1000; // 200 per gem
-  } else if (groupSize === 6) {
-    baseScore = 1600; // 267 per gem
-  } else if (groupSize === 7) {
-    baseScore = 2400; // 343 per gem
-  } else if (groupSize === 8) {
-    baseScore = 3500; // 437 per gem
+    baseScore = 300; // 100 per gem (1x3 or 3x1 line)
   } else {
-    // 9+ massive cluster bonus
-    baseScore = 3500 + (groupSize - 8) * 600;
+    // 4 gems match: 1x4 line, 4x1 line, or 2x2 square
+    baseScore = 600; // 150 per gem
   }
   return baseScore * combo;
 }
 
+// Find matches: 
+// 1. Straight lines (가로/세로 일자형 최소 1x3, 최대 4개 제한)
+// 2. Square (정사각형 2x2)
+// 3. Strictly NO diagonals (대각선 매칭 제외)
 export function findMatches(board: Cell[][], validMask: boolean[][]): MatchResult {
   const rows = board.length;
   const cols = board[0].length;
   const matchedPositions = new Set<string>();
   const matchGroups: BoardPosition[][] = [];
-  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
 
+  // Helper to check if a cell can be matched
+  const isMatchable = (r: number, c: number): boolean => {
+    const cell = board[r]?.[c];
+    return !!(validMask[r]?.[c] && cell && !cell.isObstacle && cell.type !== 'relic');
+  };
+
+  // 1. Horizontal straight lines (가로 일자형, 최소 1x3, 최대 4개)
   for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (visited[r][c]) continue;
-      const startCell = board[r]?.[c];
-      const isValid = validMask[r]?.[c] && startCell && !startCell.isObstacle;
-
-      if (!isValid) {
-        visited[r][c] = true;
+    let c = 0;
+    while (c < cols) {
+      if (!isMatchable(r, c)) {
+        c++;
         continue;
       }
 
-      // BFS to find all 8-directionally connected gems of identical type
-      const targetType = startCell.type;
-      const component: BoardPosition[] = [];
-      const queue: BoardPosition[] = [{ r, c }];
-      visited[r][c] = true;
+      const targetType = board[r][c].type;
+      let end = c + 1;
+      while (end < cols && isMatchable(r, end) && board[r][end].type === targetType) {
+        end++;
+      }
 
-      while (queue.length > 0) {
-        const curr = queue.shift()!;
-        component.push(curr);
-
-        for (const [dr, dc] of ADJACENT_DIRECTIONS) {
-          const nr = curr.r + dr;
-          const nc = curr.c + dc;
-
-          if (
-            nr >= 0 &&
-            nr < rows &&
-            nc >= 0 &&
-            nc < cols &&
-            !visited[nr][nc] &&
-            validMask[nr]?.[nc] &&
-            !board[nr][nc].isObstacle &&
-            board[nr][nc].type === targetType
-          ) {
-            visited[nr][nc] = true;
-            queue.push({ r: nr, c: nc });
+      const runLength = end - c;
+      if (runLength >= 3) {
+        if (runLength >= 6) {
+          // Two separate 3-matches
+          const g1: BoardPosition[] = [{ r, c }, { r, c: c + 1 }, { r, c: c + 2 }];
+          const g2: BoardPosition[] = [{ r, c: c + 3 }, { r, c: c + 4 }, { r, c: c + 5 }];
+          matchGroups.push(g1, g2);
+          for (let i = 0; i < 6; i++) {
+            matchedPositions.add(`${r},${c + i}`);
           }
+        } else {
+          // 3, 4, or 5 (capped at 4 per "5개 이상은 연결 안되겠다" rule)
+          const matchLen = Math.min(runLength, 4);
+          const group: BoardPosition[] = [];
+          for (let i = 0; i < matchLen; i++) {
+            group.push({ r, c: c + i });
+            matchedPositions.add(`${r},${c + i}`);
+          }
+          matchGroups.push(group);
         }
       }
 
-      // Any cluster of 3 or more is a match (lines, X, squares, L, T, clusters)
-      if (component.length >= 3) {
-        matchGroups.push(component);
-        for (const pos of component) {
-          matchedPositions.add(`${pos.r},${pos.c}`);
+      c = end;
+    }
+  }
+
+  // 2. Vertical straight lines (세로 일자형, 최소 3x1, 최대 4개)
+  for (let c = 0; c < cols; c++) {
+    let r = 0;
+    while (r < rows) {
+      if (!isMatchable(r, c)) {
+        r++;
+        continue;
+      }
+
+      const targetType = board[r][c].type;
+      let end = r + 1;
+      while (end < rows && isMatchable(end, c) && board[end][c].type === targetType) {
+        end++;
+      }
+
+      const runLength = end - r;
+      if (runLength >= 3) {
+        if (runLength >= 6) {
+          const g1: BoardPosition[] = [{ r, c }, { r: r + 1, c }, { r: r + 2, c }];
+          const g2: BoardPosition[] = [{ r: r + 3, c }, { r: r + 4, c }, { r: r + 5, c }];
+          matchGroups.push(g1, g2);
+          for (let i = 0; i < 6; i++) {
+            matchedPositions.add(`${r + i},${c}`);
+          }
+        } else {
+          // 3, 4, or 5 (capped at 4 per "5개 이상은 연결 안되겠다" rule)
+          const matchLen = Math.min(runLength, 4);
+          const group: BoardPosition[] = [];
+          for (let i = 0; i < matchLen; i++) {
+            group.push({ r: r + i, c });
+            matchedPositions.add(`${r + i},${c}`);
+          }
+          matchGroups.push(group);
+        }
+      }
+
+      r = end;
+    }
+  }
+
+  // 3. 2x2 Square matches (정사각형 2x2, 대각선 제외)
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      if (
+        !isMatchable(r, c) ||
+        !isMatchable(r, c + 1) ||
+        !isMatchable(r + 1, c) ||
+        !isMatchable(r + 1, c + 1)
+      ) {
+        continue;
+      }
+
+      const targetType = board[r][c].type;
+      if (
+        board[r][c + 1].type === targetType &&
+        board[r + 1][c].type === targetType &&
+        board[r + 1][c + 1].type === targetType
+      ) {
+        const squareGroup: BoardPosition[] = [
+          { r, c },
+          { r, c: c + 1 },
+          { r: r + 1, c },
+          { r: r + 1, c: c + 1 },
+        ];
+
+        // If not all 4 cells are already consumed by straight lines, add this 2x2 match
+        const allAlreadyInLines = squareGroup.every(pos => matchedPositions.has(`${pos.r},${pos.c}`));
+        if (!allAlreadyInLines) {
+          matchGroups.push(squareGroup);
+          for (const pos of squareGroup) {
+            matchedPositions.add(`${pos.r},${pos.c}`);
+          }
         }
       }
     }
   }
 
-  // Check for 4 or more matches to spawn a special artifact relic
+  // Check for 4 matches to spawn a special artifact relic
   let specialCreated: { pos: BoardPosition; type: GemType } | undefined;
   for (const group of matchGroups) {
-    if (group.length >= 4) {
+    if (group.length === 4) {
       specialCreated = {
         pos: group[Math.floor(group.length / 2)],
         type: 'relic',

@@ -122,16 +122,18 @@ export const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose, o
                   승리 조건: 모든 돌판을 황금으로 변환하라!
                 </h3>
                 <p className="text-xs text-[#dcd1be] leading-normal font-pixel">
-                  같은 종류의 픽셀 보석이 <strong>3개 이상 인접(상하좌우·대각선)</strong>하여 모이면, <strong>가로·세로 일직선뿐만 아니라 X자형, 2×2 네모 박스, 클러스터 뭉치</strong> 등 어떤 형태로 연결되어 있든 즉시 매치되며 석판이 눈부신 <strong>황금 타일(GOLD TILE)</strong>로 변환됩니다!
+                  같은 종류의 픽셀 보석이 <strong>1. 일자형(가로/세로 최소 1×3, 최대 4개)</strong> 또는 <strong>2. 정사각형(2×2 네모)</strong>으로 모이면 즉시 매치되며 석판이 눈부신 <strong>황금 타일(GOLD TILE)</strong>로 변환됩니다! <strong>🚫 대각선 연결은 인정되지 않습니다.</strong> (밸런스를 위해 5개 이상은 한 번에 연결되지 않고 최대 4개까지만 안전하게 매치됩니다.)
                 </p>
                 <div className="mt-2 p-2.5 bg-[#17130e] border border-[#f59e0b]/40 text-xs font-pixel text-[#fde047]">
-                  <strong>💎 보석 개수별 배점 & 유물 시스템:</strong>
+                  <strong>💎 보석 매치 배점 & 연결/낙하 규칙:</strong>
                   <ul className="list-disc list-inside mt-1 text-[#dcd1be] space-y-0.5">
-                    <li>3개 매치: 300점 (기본 매치)</li>
-                    <li>4개 매치 (네모/라인): 600점 + <strong>고대 태양 유물(☀️)</strong> 생성!</li>
-                    <li>5개 매치 (X자/십자): 1,000점!</li>
-                    <li>6개 매치: 1,600점 / 8개 매치: 3,500점 / 9개+ 초대형 클러스터!</li>
-                    <li>유물(☀️)을 보석과 스와프하면 <strong>해당 색상 보석 전체 정화 폭발</strong>!</li>
+                    <li>1. 일자형 매치 (1×3 또는 3×1): 300점 (기본 매치)</li>
+                    <li>2. 정사각형 매치 (2×2): 600점 + <strong>고대 태양 유물(☀️)</strong> 생성!</li>
+                    <li>3. 일자형 4매치 (1×4 또는 4×1): 600점 + <strong>고대 태양 유물(☀️)</strong> 생성!</li>
+                    <li>🚫 대각선 매치 불가: 대각선 연결이나 X자 대각 배치는 매치로 인정되지 않습니다.</li>
+                    <li>🚫 5개 이상 연결 제한: 5개 이상 과도한 연결 방지 (최대 4개 매치 적용)</li>
+                    <li>⬇️ 신규 블록 낙하 제어: 새 블록이 나올 때는 무조건 아래 블록과 2블록 미만으로 연속 생성 보장!</li>
+                    <li>☀️ 유물(태양석)을 보석과 스와프하면 <strong>해당 색상 보석 전체 정화 폭발</strong>!</li>
                   </ul>
                 </div>
               </div>
